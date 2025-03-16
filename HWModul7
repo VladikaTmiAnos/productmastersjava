@@ -1,0 +1,214 @@
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+
+public class TwitterApp {
+    public static void main(String[] args) {
+        new TwitterConsole().start();
+    }
+}
+
+// Класс пользователя
+class User {
+    private final String name;
+
+    public User(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+
+// Класс поста
+class Post {
+    private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
+
+    private final int id;
+    private final String author;
+    private final String content;
+    private int likes;
+    private int reposts;
+    private final LocalDateTime timestamp;
+
+    public Post(String author, String content) {
+        this.id = ID_GENERATOR.getAndIncrement();
+        this.author = author;
+        this.content = content;
+        this.likes = 0;
+        this.reposts = 0;
+        this.timestamp = LocalDateTime.now();
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public int getLikes() {
+        return likes;
+    }
+
+    public int getReposts() {
+        return reposts;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public void like() {
+        likes++;
+    }
+
+    public void repost() {
+        reposts++;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Post{id=%d, author=%s, content='%s', likes=%d, reposts=%d}",
+                id, author, content, likes, reposts);
+    }
+}
+
+// Основной функционал Twitter
+class TwitterConsole {
+    private final Scanner scanner = new Scanner(System.in);
+    private final List<Post> posts = new ArrayList<>();
+    private User currentUser;
+
+    public void start() {
+        System.out.print("Введите ваше имя: ");
+        String name = scanner.nextLine();
+        currentUser = new User(name);
+        System.out.println("Добро пожаловать, " + name + "!\n");
+
+        initSamplePosts();
+
+        boolean running = true;
+        while (running) {
+            printMenu();
+            String choice = scanner.nextLine();
+            switch (choice) {
+                case "1" -> createPost();
+                case "2" -> likePost();
+                case "3" -> repostPost();
+                case "4" -> showAllPosts();
+                case "5" -> showPopularPosts();
+                case "6" -> showMyPosts();
+                case "7" -> running = false;
+                default -> System.out.println("Неверный ввод. Попробуйте снова.");
+            }
+        }
+
+        System.out.println("Выход...");
+    }
+
+    private void printMenu() {
+        System.out.println("\n=== Twitter Console ===");
+        System.out.println("1. Написать пост");
+        System.out.println("2. Лайкнуть пост");
+        System.out.println("3. Сделать репост");
+        System.out.println("4. Показать все посты");
+        System.out.println("5. Показать популярные посты");
+        System.out.println("6. Показать мои посты");
+        System.out.println("7. Выход");
+        System.out.print("Выберите действие: ");
+    }
+
+    private void initSamplePosts() {
+        posts.add(new Post("Alice", "Привет, мир!"));
+        posts.add(new Post("Bob", "Сегодня отличный день!"));
+        posts.add(new Post("Charlie", "Люблю программировать на Java."));
+        System.out.println("Добавлены стартовые посты.");
+    }
+
+    private void createPost() {
+        System.out.print("Введите текст поста (макс. 280 символов): ");
+        String content = scanner.nextLine();
+        if (content.length() > 280) {
+            System.out.println("Текст слишком длинный!");
+            return;
+        }
+        posts.add(new Post(currentUser.getName(), content));
+        System.out.println("Пост добавлен!");
+    }
+
+    private void likePost() {
+        System.out.print("Введите ID поста для лайка: ");
+        try {
+            int id = Integer.parseInt(scanner.nextLine());
+            posts.stream()
+                    .filter(p -> p.getId() == id)
+                    .findFirst()
+                    .ifPresentOrElse(
+                            post -> {
+                                post.like();
+                                System.out.println("Пост лайкнут!");
+                            },
+                            () -> System.out.println("Пост не найден.")
+                    );
+        } catch (NumberFormatException e) {
+            System.out.println("Неверный формат ID.");
+        }
+    }
+
+    private void repostPost() {
+        System.out.print("Введите ID поста для репоста: ");
+        try {
+            int id = Integer.parseInt(scanner.nextLine());
+            posts.stream()
+                    .filter(p -> p.getId() == id)
+                    .findFirst()
+                    .ifPresentOrElse(
+                            post -> {
+                                post.repost();
+                                posts.add(new Post(currentUser.getName(), "Репост: " + post.getContent()));
+                                System.out.println("Репост сделан!");
+                            },
+                            () -> System.out.println("Пост не найден.")
+                    );
+        } catch (NumberFormatException e) {
+            System.out.println("Неверный формат ID.");
+        }
+    }
+
+    private void showAllPosts() {
+        System.out.println("\nВсе посты:");
+        posts.stream()
+                .sorted(Comparator.comparing(Post::getTimestamp).reversed())
+                .forEach(System.out::println);
+    }
+
+    private void showPopularPosts() {
+        System.out.print("Сколько популярных постов показать? ");
+        try {
+            int count = Integer.parseInt(scanner.nextLine());
+            System.out.println("\nПопулярные посты:");
+            posts.stream()
+                    .sorted(Comparator.comparing(Post::getLikes).reversed())
+                    .limit(count)
+                    .forEach(System.out::println);
+        } catch (NumberFormatException e) {
+            System.out.println("Введите корректное число.");
+        }
+    }
+
+    private void showMyPosts() {
+        System.out.println("\nМои посты:");
+        posts.stream()
+                .filter(p -> p.getAuthor().equals(currentUser.getName()))
+                .sorted(Comparator.comparing(Post::getTimestamp).reversed())
+                .forEach(System.out::println);
+    }
+}
